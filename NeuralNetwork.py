@@ -23,7 +23,7 @@ def tanh(x):
     return np.tanh(x)
 
 def tanh_d(x):
-    return 1-pow(tanh(x),2)
+    return 1-((tanh(x))**2)
 
 def relu(x): #rectified linear unit
     return np.maximum(0.0,x)
@@ -35,6 +35,9 @@ def relu_d(x):
         return 0
 
 #don't forget feature scaling
+
+
+
 class NeuralNetwork(object):
     def __init__(self,x,y,activation_name):
         self.inputLayerSize = x.shape[1]
@@ -42,32 +45,44 @@ class NeuralNetwork(object):
         self.hiddenLayerSize = 2
         self.outputLayerSize = y.shape[1]
         self.numOfExamples = x.shape[0]
+        if(activation_name == 'sigmoid'):
+            self.act = sigmoid
+            self.act_d = sigmoid_d
+        elif(activation_name == 'tanh'):
+            self.act = tanh
+            self.act_d = tanh_d
+        elif(activation_name == 'relu'):
+            self.act = relu
+            self.act_d = relu_d
+        else:
+            raise ValueError("Invalid activation function")
 
-        #1st Define weights
+
+        #1st initialize the weights
         self.W1 = np.random.randn(self.inputLayerSize,self.hiddenLayerSize)
         self.W2 = np.random.randn(self.hiddenLayerSize,self.outputLayerSize)
 
     #2nd forward prop
-    def forward(self,X):
+    def fprop(self,X):
         self.z2 = np.dot(X,self.W1)
-        self.a2 = sigmoid(self.z2)
+        self.a2 = self.act(self.z2)
         self.z3 = np.dot(self.a2,self.W2)
-        yHat = sigmoid(self.z3)
+        yHat = self.act(self.z3)
         return yHat
 
     #3rd Cost function
     def J(self,X,y):
-        self.yHat = self.forward(X)
+        self.yHat = self.fprop(X)
         error = sum((self.yHat-y)**2)#np.dot(y.T,np.log(self.yHat)) + np.dot((1-y.T),np.log(1-self.yHat))
         return 0.5*error #(-1/self.numOfExamples) * error
 
 
     #4th back prop to
     def dJ_dW(self,X,y):
-        delta3 = np.multiply(self.yHat-y,sigmoid_d(self.z3)) # element wise multiplication
+        delta3 = np.multiply(self.yHat-y,self.act_d(self.z3)) # element wise multiplication
         dJ_dW2 = np.dot(self.a2.T,delta3) # matrix maltiplication
 
-        delta2 = np.dot(delta3,self.W2.T)*sigmoid_d(self.z2)
+        delta2 = np.dot(delta3,self.W2.T)*self.act_d(self.z2)
         dJ_dW1 = np.dot(X.T,delta2)
 
         return dJ_dW1,dJ_dW2
@@ -134,7 +149,7 @@ def gd(N,x,y,alpha,error = 1e-10,max_iter = 100000):
         cost_new = N.J(x,y)
         costs.append(cost_new)
         i+=1
-
+        print("Iteration ", i, ", Cost: ", cost_new)
         if((cost_old-cost_new)**2 < error):
             print("Converged, iterations: ", i)
             converged = True
@@ -147,9 +162,18 @@ def gd(N,x,y,alpha,error = 1e-10,max_iter = 100000):
         cost_old = cost_new
     return  costs
 
+#7th predict
+def target_check(N, x, y):
+    pred = N.fprop(x)
+    print("========================================")
+    print("Patterns:")
+    for i in range(0,y.shape[0]):
+        print(" pattern",i+1,":",x[i],y[i],"prediction ->",pred[i])
+    print("========================================")
+
 
 x = np.array(([0,0],[0,1],[1,0],[1,1]),dtype=float)
-y = np.array(([0],[1],[1],[0]),dtype=float)
+y = np.array(([0],[1],[1],[1]),dtype=float)
 alpha = 0.3
 max_iter = 5000
 NN = NeuralNetwork(x,y,"sigmoid")
@@ -166,4 +190,6 @@ plt.plot(costs)
 plt.xlabel("Iterations")
 plt.ylabel("Cost")
 plt.show()
+
+prediction = target_check(NN,x,y)
 
