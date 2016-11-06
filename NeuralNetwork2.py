@@ -232,13 +232,13 @@ class FullyConnectedLayer(Layer,Parameterized):
         # where num_units_prev is the number of units in the input
         # (previous) layer
         self.input_shape = input_layer.output_size()
-        print("Input shape =", self.input_shape)
+        # print("Input shape =", self.input_shape)
 
         # this is the weight matrix it should have shape: (num_units_prev, num_units)
         W = np.random.normal(0, init_stddev, self.input_shape[1]*self.num_units)
         W = W.reshape(self.input_shape[1],self.num_units)
         self.W = W
-        print("W shapes:",self.W.shape)
+        # print("W shapes:",self.W.shape)
         b = np.random.normal(0, init_stddev, self.num_units)
         self.b = b
         self.dW = None
@@ -270,13 +270,13 @@ class FullyConnectedLayer(Layer,Parameterized):
         self.db = np.mean(output_grad,axis=0)
         grad_input = np.dot(output_grad,self.W.T)
 
-        print("last input a = ", self.last_input.shape)
-        print("W shape:",self.W.shape)
-        print("dW shape:",self.dW.shape)
-        print("b shape",self.b.shape)
-        print("db shape",self.db.shape)
-        print("grad output shape =",output_grad.shape)
-        print("grad input shape =",grad_input.shape)
+        # print("last input a = ", self.last_input.shape)
+        # print("W shape:",self.W.shape)
+        # print("dW shape:",self.dW.shape)
+        # print("b shape",self.b.shape)
+        # print("db shape",self.db.shape)
+        # print("grad output shape =",output_grad.shape)
+        # print("grad input shape =",grad_input.shape)
         return grad_input
 
 
@@ -402,11 +402,11 @@ class NeuralNetwork:
             the complete network up to layer 'upto'
         """
         next_grad = self.layers[-1].input_grad(Y, Y_pred)
-        i = 4
+        # i = 4
         for layer in reversed((self.layers[upto:-1])):
-            print("=================================")
-            print("layer",i)
-            i-=1
+            # print("=================================")
+            # print("layer",i)
+            # i-=1
             next_grad = layer.bprop(next_grad)
 
         return next_grad
@@ -515,7 +515,7 @@ class NeuralNetwork:
         for l, layer in enumerate(self.layers):
 
             if isinstance(layer, Parameterized):
-
+                print("=====================")
                 print('checking gradient for layer {}'.format(l))
                 for p, param in enumerate(layer.params()):
                      # 1st iter is the W, second is the b
@@ -554,12 +554,12 @@ class NeuralNetwork:
                     # to a vector for convenient comparisons, printing etc.
                     param_init = np.ravel(np.copy(param))
 
-                    # TODO ####################################
-                    # TODO compute the gradient with respect to
+                    #
+                    #       compute the gradient with respect to
                     #      the initial parameters in two ways:
                     #      1) with grad_given_params()
                     #get the derivatives
-                   # grad_param_init = grad_given_params(param_init)
+                    grad_param_init = grad_given_params(param_init)
 
                     #      2) with finite differences
                     #         using output_given_params()
@@ -567,7 +567,7 @@ class NeuralNetwork:
                     #      if your implementation is correct
                     #      both results should be epsilon close
                     #      to each other!
-                    # TODO ####################################
+
                     epsilon = 1e-4
                     # making sure your gradient checking routine itself
                     # has no errors can be a bit tricky. To debug it
@@ -577,15 +577,26 @@ class NeuralNetwork:
                     import scipy.optimize
                     err = scipy.optimize.check_grad(output_given_params,
                                                     grad_given_params, param_init)
-                    print(err)
-                    loss_base = output_given_params(param_init)
-                    # TODO this should hold the gradient as calculated through bprop
-                    gparam_bprop = None
-                    # TODO this should hold the gradient calculated through  finite differences
+                    print("Cheat gradient check error =",err)
+
+
+                    # finite diff
                     gparam_fd = np.zeros_like(param_init)
+                    perturb = np.zeros(param_init.shape)
+                    for i in range(len(param_init)):
+
+                        perturb[i] = epsilon
+                        loss_plus = output_given_params(param_init + perturb)
+                        loss_minus = output_given_params(param_init - perturb)
+                        gparam_fd[i] = (loss_plus - loss_minus) / (2*epsilon)
+                        perturb[i] = 0
+                    gparam_fd = gparam_fd.reshape(param_shape)
+
+                    # gradient as calculated through bprop
+                    gparam_bprop = grad_param_init.reshape(param_shape)
                     # calculate difference between them
                     err = np.mean(np.abs(gparam_bprop - gparam_fd))
-                    print('diff {:.2e}'.format(err))
+                    print('Implemented Gradient check error {:.2e}'.format(err))
                     assert(err < epsilon)
 
                     # reset the parameters to their initial values
@@ -626,7 +637,7 @@ layers.append(FullyConnectedLayer(
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=6,
+                num_units=10,
                 init_stddev=0.1,
                 activation_fun=Activation('tanh')
 ))
@@ -648,7 +659,6 @@ for i in range(Y.shape[0]):
     idx = np.random.randint(n_labels)
     Y[i, idx] = 1.
 
-print(Y)
 
 nn.check_gradients(X, Y)
 
