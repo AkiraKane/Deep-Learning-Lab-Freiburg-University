@@ -356,7 +356,7 @@ class SoftmaxOutput(Layer, Loss):
     def loss(self, Y, Y_pred):
         # Assume one-hot encoding of Y
         # calculate softmax first
-        out = softmax(Y_pred)   # WHY ???
+        out = softmax(Y_pred)   # WHY ??? Y_pred is already a softmax function
         # to make the loss numerically stable
         # you may want to add an epsilon in the log ;)
         eps = 1e-10
@@ -365,11 +365,8 @@ class SoftmaxOutput(Layer, Loss):
         # sum of the each elements in every examples
         loss = - np.sum(Y * np.log(Y_pred+eps),axis=1)
 
-        #print("mean",np.mean)
         #sum of all the examples / number of examples
         return np.mean(loss)
-
-
 
 
 
@@ -416,26 +413,79 @@ class NeuralNetwork:
         """ Calculate error on the given data
             assuming they are classes that should be predicted.
         """
-        Y_pred = one_hot(self.predict(X))
+        Y_pred = unhot(self.predict(X))
         error = Y_pred != Y
         return np.mean(error)
+
+
+    def get_all_params(self):
+        params_all = np.array([])
+        for layer in self.layers:
+            if isinstance(layer,Parameterized):
+                for params in layer.params():
+                    #first get the parameters
+                    # print(params.shape)
+                    # print(params)
+                    #add W first then b of each layer
+                    params_all = np.append(params_all,np.ravel(params))
+
+        # print("all")
+        #print(params_all)
+        #print(params_all.shape)
+        return params_all
+
+
+    def set_all_params(self,params_all):
+        num_prev_weights = 0
+        for layer in self.layers:
+             if isinstance(layer,Parameterized):
+                 for p,params in enumerate(layer.params()):
+                     if params.ndim == 2:
+                         size = params.shape[0] * params.shape[1]
+                     else:
+                        size = params.shape[0]
+
+                     # print(params.shape)
+                     params[:] = np.reshape(params_all[num_prev_weights:size+num_prev_weights]
+                                            ,params.shape)
+                     num_prev_weights+=size
+                     # print(params)
+
+
+
+
 
 
     def sgd_epoch(self, X, Y, learning_rate, batch_size):
         n_samples = X.shape[0]
         n_batches = n_samples // batch_size
         for b in range(n_batches):
-            # TODO #####################################
+
             # Implement stochastic gradient descent here
-            # TODO #####################################
             # start by extracting a batch from X and Y
             # (you can assume the inputs are already shuffled)
+            X_batch = X[b*batch_size:b*batch_size + batch_size,:]
+            Y_batch = Y[b*batch_size:b*batch_size + batch_size,:]
+            # print("batch number",b)
+            # print("X batch",X_batch)
+            # print("Y batch",Y_batch)
+
+
+
+
+
 
             # TODO: then forward and backward propagation + updates
             # HINT: layer.params() returns parameters *by reference*
             #       so you can easily update in-place
+            for layer in self.layers:
+                if(isinstance(layer,Parameterized)):
+                    params = layer.params()
+
 
             pass
+
+
 
 
     def gd_epoch(self, X, Y, learning_rate,error,max_iter = 100000):
@@ -445,20 +495,20 @@ class NeuralNetwork:
         #   There are two strategies you can follow:
         #   Either shove the whole dataset throught the network
         #   at once (which can be problematic for large datasets)
-        #   or run through it batch wise as in the sgd approach
+        #   or run through it batch  ise as in the sgd approach
         #   and accumulate the gradients for all parameters as
         #   you go through the data. Either way you should then
         #   do one gradient step after you went through the
         #   complete dataset!
-        i = 0
-        converged = False
-        costs = []
-        cost_old = self._loss(X,Y)
-        costs.append(cost_old)
-
+        # i = 0
+        # converged = False
+        # costs = []
+        # cost_old = self._loss(X,Y)
+        # costs.append(cost_old)
+        #
         # while not converged:
         #
-        #     partial_deravatives = self.(x,y)
+        #     partial_deravatives = self.layers
         #     W = N.get_weights()
         #     W = W - alpha*partial_deravatives
         #     N.set_weights(W)
@@ -477,7 +527,9 @@ class NeuralNetwork:
         #
         #     cost_old = cost_new
         # return  costs
+        pass
         # TODO ##################################################
+
 
 
 
@@ -568,7 +620,7 @@ class NeuralNetwork:
                     #      both results should be epsilon close
                     #      to each other!
 
-                    epsilon = 1e-4
+                    epsilon = 1e-5
                     # making sure your gradient checking routine itself
                     # has no errors can be a bit tricky. To debug it
                     # you can "cheat" by using scipy which implements
@@ -631,13 +683,13 @@ layers = [InputLayer(input_shape)]
 
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=15,
+                num_units=2,
                 init_stddev=0.1,
                 activation_fun=Activation('relu')
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=10,
+                num_units=2,
                 init_stddev=0.1,
                 activation_fun=Activation('tanh')
 ))
@@ -659,6 +711,9 @@ for i in range(Y.shape[0]):
     idx = np.random.randint(n_labels)
     Y[i, idx] = 1.
 
+nn.sgd_epoch(X,Y,0.01,1)
+#nn.check_gradients(X, Y)
+all =nn.get_all_params()
 
-nn.check_gradients(X, Y)
+nn.set_all_params(all)
 
