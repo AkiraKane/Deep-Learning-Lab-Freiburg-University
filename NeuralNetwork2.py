@@ -5,6 +5,7 @@ import os
 import gzip
 import math
 import sys
+import time
 from matplotlib import pyplot as plt
 
 # Loading data from MNIST
@@ -51,15 +52,6 @@ def mnist(datasets_dir='./data'):
 
 
 
-# 1) Randomly initialize Weights
-# 2) Implement fprop to get vector of outputs to any vector of inputs
-# 3) Implement Code to compute cost function (vector of outputs from (2) - real outputs from the data itself)
-# 4) Implemet backprop to get partial derivatives for each parameter theta
-# 5) use gradient checking to compare between partial derivatives from backprop vs. using numerical  estimate  of gradient of cost function
-# then disable gradient checking code as it takes time each time you will train the network
-# 6) use gradient descent/stochastic gd  with backprop to try and minimize the cost function
-
-
 # define Activation functions
 def sigmoid(x):
     return 1/(1+ np.exp(-x))
@@ -74,7 +66,7 @@ def tanh_d(x):
     return 1-((tanh(x))**2)
 
 def relu(x): #rectified linear unit
-    return np.maximum(0.0,x) #needs ADJUSTMENT
+    return np.maximum(0.0,x)
 
 def relu_d(x):
     dx = np.zeros(x.shape)
@@ -115,6 +107,7 @@ def unhot(one_hot_labels):
 class Activation(object):
 
     def __init__(self, tname):
+        self.tname = tname
         if tname == 'sigmoid':
             self.act = sigmoid
             self.act_d = sigmoid_d
@@ -131,11 +124,13 @@ class Activation(object):
         # we need to remember the last input
         # so that we can calculate the derivative with respect
         # to it later on
-        self.last_input = input
+        self.z = input
+        # print("Z activated")
         return self.act(input)
 
     def bprop(self, output_grad):
-        return output_grad * self.act_d(self.last_input)
+
+        return output_grad * self.act_d(self.z)
 
 
 
@@ -212,9 +207,11 @@ class InputLayer(Layer):
         return self.input_shape
 
     def fprop(self, input):
+        # print("fprop Input layer")
         return input
 
     def bprop(self, output_grad):
+        # print("bprop Input layer")
         return output_grad
 
 
@@ -247,17 +244,26 @@ class FullyConnectedLayer(Layer,Parameterized):
     def output_size(self):
         return (self.input_shape[0], self.num_units)
 
-    def fprop(self, input): ########input is the a in previous layer and output is the z of this layer
+    def fprop(self, input): ########input is the a or z in previous layer and output is the z of this layer
         #
         # implement forward propagation
-        ############################################# NOTE: you should also handle the case were
+        ######  NOTE: you should also handle the case were
         #       activation_fun is None (meaning no activation)
         #       then this is simply a linear layer
-        z = np.dot(input,self.W) + self.b
+        #calculate net (z)
+        output = np.dot(input,self.W) + self.b
+        # print("Calculate Z")
+        if self.activation_fun is not None:
+            #activation function (a) of net(z)
+            # print("Go activate Z to be a")
+            output = self.activation_fun.fprop(output)
+
         # you again want to cache the last_input for the bprop
         # implementation below!
-        self.last_input = input
-        return z
+        self.last_input = input #
+        # print("last input after activation",self.last_input.shape)
+
+        return output
 
 
     def bprop(self, output_grad): #output grad is delta of next layer
@@ -265,18 +271,21 @@ class FullyConnectedLayer(Layer,Parameterized):
         # HINT: you may have to divide the weights by n
         #       to make gradient checking work
         #       (since you want to divide the loss by number of inputs)
+        if self.activation_fun is not None:
+            output_grad = self.activation_fun.bprop(output_grad)
+
         n = output_grad.shape[0]
         self.dW = np.dot(self.last_input.T, output_grad)/n
         self.db = np.mean(output_grad,axis=0)
         grad_input = np.dot(output_grad,self.W.T)
-
-        # print("last input a = ", self.last_input.shape)
+        # print("last input  = ", self.last_input.shape)
         # print("W shape:",self.W.shape)
         # print("dW shape:",self.dW.shape)
         # print("b shape",self.b.shape)
         # print("db shape",self.db.shape)
         # print("grad output shape =",output_grad.shape)
         # print("grad input shape =",grad_input.shape)
+
         return grad_input
 
 
@@ -306,6 +315,7 @@ class LinearOutput(Layer, Loss):
         return (1,)
 
     def fprop(self, input):
+        #print("Fprop Linear output")
         return input
 
     def bprop(self, output_grad):
@@ -339,6 +349,7 @@ class SoftmaxOutput(Layer, Loss):
         return (1,)
 
     def fprop(self, input):
+       # print("Fprop Softmax output")
         return softmax(input)
 
     def bprop(self, output_grad):
@@ -384,13 +395,18 @@ class NeuralNetwork:
 
 
     def predict(self, X):
+       # print("Entered predict (X)")
         """ Calculate an output Y for the given input X. """
         # forward pass through all layers
-        a = X
-        for layer in self.layers:
-            a = layer.fprop(a)
+        input = X
+        #print("Start fprop through all layers")
+        for l,layer in enumerate(self.layers):
+         #   print("========================")
+          #  print("Go fprop for layer", l+1)
+            input = layer.fprop(input)
 
-        Y_pred = a
+
+        Y_pred = input
         return Y_pred
 
 
@@ -399,11 +415,11 @@ class NeuralNetwork:
             the complete network up to layer 'upto'
         """
         next_grad = self.layers[-1].input_grad(Y, Y_pred)
-        # i = 4
+        #i = 4
         for layer in reversed((self.layers[upto:-1])):
-            # print("=================================")
-            # print("layer",i)
-            # i-=1
+           # print("=================================")
+            #print("layer",i)
+            #i-=1
             next_grad = layer.bprop(next_grad)
 
         return next_grad
@@ -428,11 +444,25 @@ class NeuralNetwork:
                     # print(params)
                     #add W first then b of each layer
                     params_all = np.append(params_all,np.ravel(params))
-
         # print("all")
         #print(params_all)
         #print(params_all.shape)
         return params_all
+
+    def get_all_grads(self):
+        grads_all = np.array([])
+        for layer in self.layers:
+            if isinstance(layer,Parameterized):
+                for grads in layer.grad_params():
+                    #first get the grads
+                    # print(grads.shape)
+                    # print(grads)
+                    #add W first then b of each layer
+                    grads_all = np.append(grads_all,np.ravel(grads))
+        # print("all")
+        # print(grads_all)
+        # print(grads_all.shape)
+        return grads_all
 
 
     def set_all_params(self,params_all):
@@ -452,10 +482,6 @@ class NeuralNetwork:
                      # print(params)
 
 
-
-
-
-
     def sgd_epoch(self, X, Y, learning_rate, batch_size):
         n_samples = X.shape[0]
         n_batches = n_samples // batch_size
@@ -470,20 +496,16 @@ class NeuralNetwork:
             # print("X batch",X_batch)
             # print("Y batch",Y_batch)
 
+            # full forward propagation
+            Y_pred = self.predict(X_batch)
 
+            # full backward propagation
+            self.backpropagate(Y_batch,Y_pred)
+            params_all = self.get_all_params()
+            grads_all = self.get_all_grads()
+            params_all = params_all - learning_rate*grads_all
+            self.set_all_params(params_all)
 
-
-
-
-            # TODO: then forward and backward propagation + updates
-            # HINT: layer.params() returns parameters *by reference*
-            #       so you can easily update in-place
-            for layer in self.layers:
-                if(isinstance(layer,Parameterized)):
-                    params = layer.params()
-
-
-            pass
 
 
 
@@ -542,6 +564,7 @@ class NeuralNetwork:
             Y_train = one_hot(Y)
         else:
             Y_train = Y
+
         print("... starting training")
         for e in range(max_epochs+1):
             if descent_type == "sgd":
@@ -560,6 +583,32 @@ class NeuralNetwork:
             # simply make the function take validation data as input
             # and then compute errors here and print them
             # TODO ##################################################
+
+
+    def test(self,X,Y):
+        Y_predict = self.predict(X)
+        Y_predict = unhot(Y_predict)
+        print("====================")
+        print("Examples :")
+        for i in range(0,len(Y)):
+            print("Example number",i+1,"| Real Target:",Y[i],
+                  "| Predicted:", Y_predict[i])
+
+        h = np.zeros(Y.shape)
+        h[Y != Y_predict] = 1
+
+        j = 0
+        for i in range(0,len(Y)):
+            if(h[i] == 1):
+                j+=1
+        print("j",j)
+        print(j/Y.shape[0])
+
+        error = Y!= Y_predict
+        error = np.mean(error)
+        print("error",error)
+        print("Examples correctly predicted: ", (1-error )*100,"%")
+
 
     def check_gradients(self, X, Y):
         """ Helper function to test the parameter gradients for
@@ -595,6 +644,7 @@ class NeuralNetwork:
                         # copy provided parameters
                         param[:] = np.reshape(param_new, param_shape)
                         # Forward propagation through the net
+                        #print("Go enter dict(X)")
                         Y_pred = self.predict(X)
                         # Backpropagation of partial derivatives
                         self.backpropagate(Y, Y_pred, upto=l)
@@ -677,43 +727,98 @@ class NeuralNetwork:
 
 #Gradient Checking
 
-input_shape = (5, 10)
-n_labels = 6
-layers = [InputLayer(input_shape)]
+# input_shape = (5, 10)
+# n_labels = 6
+# layers = [InputLayer(input_shape)]
+#
+# layers.append(FullyConnectedLayer(
+#                 layers[-1],
+#                 num_units=15,
+#                 init_stddev=0.1,
+#                 activation_fun=Activation('sigmoid')
+# ))
+# layers.append(FullyConnectedLayer(
+#                 layers[-1],
+#                 num_units=6,
+#                 init_stddev=0.1,
+#                 activation_fun=Activation('sigmoid')
+# ))
+# layers.append(FullyConnectedLayer(
+#                 layers[-1],
+#                 num_units=n_labels,
+#                 init_stddev=0.1,
+#                 activation_fun= None
+# ))
+# layers.append(SoftmaxOutput(layers[-1]))
+# nn = NeuralNetwork(layers)
+#
+# # create random data
+# X = np.random.normal(size=input_shape)
+# # and random labels
+# Y = np.zeros((input_shape[0], n_labels))
+#
+# for i in range(Y.shape[0]):
+#     idx = np.random.randint(n_labels)
+#     Y[i, idx] = 1.
+#
+#
+# nn.check_gradients(X,Y)
+# nn.train(X, Y, learning_rate=0.1,
+#           max_epochs=20, batch_size=64, y_one_hot=False)
 
+
+
+# #Training on MNIST
+# # load
+Dtrain, Dval, Dtest = mnist()
+X_train, y_train = Dtrain
+# Downsample training data to make it a bit faster for testing this code
+n_train_samples = 10000
+train_idxs = np.random.permutation(X_train.shape[0])[:n_train_samples]
+X_train = X_train[train_idxs]
+y_train = y_train[train_idxs]
+print("X_train shape: {}".format(np.shape(X_train)))
+print("y_train shape: {}".format(np.shape(y_train)))
+X_train = X_train.reshape(X_train.shape[0], -1)
+print("Reshaped X_train size: {}".format(X_train.shape))
+
+# Setup a small MLP / Neural Network
+# we can set the first shape to None here to indicate that
+# we will input a variable number inputs to the network
+input_shape = (None, 28*28)
+layers = [InputLayer(input_shape)]
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=2,
-                init_stddev=0.1,
+                num_units=100,
+                init_stddev=0.01,
                 activation_fun=Activation('relu')
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=2,
-                init_stddev=0.1,
-                activation_fun=Activation('tanh')
+                num_units=100,
+                init_stddev=0.01,
+                activation_fun=Activation('relu')
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=n_labels,
-                init_stddev=0.1,
-                activation_fun=Activation('sigmoid')
+                num_units=10,
+                init_stddev=0.01,
+                # last layer has no nonlinearity
+                # (softmax will be applied in the output layer)
+                activation_fun= None
 ))
 layers.append(SoftmaxOutput(layers[-1]))
 nn = NeuralNetwork(layers)
 
-# create random data
-X = np.random.normal(size=input_shape)
-# and random labels
-Y = np.zeros((input_shape[0], n_labels))
+#nn.check_gradients(X_train, one_hot(y_train))
+# Train neural network
+t0 = time.time()
+nn.train(X_train, y_train, learning_rate=0.1,
+        max_epochs=20, batch_size=20, y_one_hot=True)
+t1 = time.time()
+print('Duration: {:.1f}s'.format(t1-t0))
 
-for i in range(Y.shape[0]):
-    idx = np.random.randint(n_labels)
-    Y[i, idx] = 1.
+nn.test(X_train,y_train)
 
-nn.sgd_epoch(X,Y,0.01,1)
-#nn.check_gradients(X, Y)
-all =nn.get_all_params()
 
-nn.set_all_params(all)
-
+# 7war el gradient checking shwyt printing
