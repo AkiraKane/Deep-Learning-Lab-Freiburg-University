@@ -334,12 +334,11 @@ class SoftmaxOutput(Layer, Loss):
         out = softmax(Y_pred)   # WHY ??? Y_pred is already a softmax function
         # to make the loss numerically stable
         # you may want to add an epsilon in the log ;)
-        eps = 1e-20
+        eps = 1e-10
 
         # calculate negative log likelihood
         # sum of the each elements in every examples
-        loss = - np.sum(((Y * np.log(Y_pred+eps)) +
-                         ((1-Y)*np.log(1-Y_pred-eps))),axis=1)
+        loss = - np.sum(((Y * np.log(Y_pred+eps))),axis=1)
 
         #sum of all the examples / number of examples
         return np.mean(loss)
@@ -495,7 +494,6 @@ class NeuralNetwork:
                     for param,grad in zip(layer.params(),layer.grad_params()):
                         param -= learning_rate*grad
 
-
     #gradient descent
     def gd_epoch(self, X, Y, learning_rate):
         # full forward propagation
@@ -508,8 +506,6 @@ class NeuralNetwork:
             if isinstance(layer,Parameterized):
                 for param,grad in zip(layer.params(),layer.grad_params()):
                     param -= learning_rate*grad
-
-
 
     #gradient descent with momentum
     def gdm_epoch(self, X, Y, learning_rate,step):
@@ -545,7 +541,7 @@ class NeuralNetwork:
             Y_val = Yval
 
         #some arrays for the rprop
-        step_rprop = 0.01* np.ones(self.get_all_params().shape)
+        step_rprop = 0.1* np.ones(self.get_all_params().shape)
         last_grad = np.zeros(self.get_all_params().shape)
 
         # step for the gradient descent with momentum
@@ -583,7 +579,7 @@ class NeuralNetwork:
 
         plt.axis([0, max_epochs+1, 0, 100])
         plt.xlabel("Training Epochs")
-        plt.ylabel("Validation Error(%)")
+        plt.ylabel("Error(%)")
         plt.plot(val_arr*100,label = 'Validation error')
         plt.plot(train_arr*100, label = 'Training error')
         plt.title("Training vs Validation error")
@@ -607,8 +603,6 @@ class NeuralNetwork:
         print("Classification error: ",test_classification_error*100,"%",)
         print("Loss error",test_loss)
         print("====================")
-
-
 
     def check_gradients(self, X, Y):
         """ Helper function to test the parameter gradients for
@@ -671,7 +665,7 @@ class NeuralNetwork:
                     #      both results should be epsilon close
                     #      to each other!
 
-                    epsilon = 1e-3
+                    epsilon = 1e-4
                     # making sure your gradient checking routine itself
                     # has no errors can be a bit tricky. To debug it
                     # you can "cheat" by using scipy which implements
@@ -809,10 +803,11 @@ nn = NeuralNetwork(layers)
 
 
 t0 = time.time()
-nn.train(X_train, y_train, X_val, y_val, learning_rate=0.4,
-        max_epochs=40, batch_size=100,descent_type="sgd", y_one_hot=True)
+nn.train(X_train, y_train, X_val, y_val, learning_rate=0.35,
+        max_epochs=30, batch_size=100,descent_type="sgd", y_one_hot=True)
 t1 = time.time()
 print('Duration: {:.1f}s'.format(t1-t0))
 nn.test(X_test,y_test)
+
 plt.show()
 
