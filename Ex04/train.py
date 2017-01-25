@@ -158,7 +158,7 @@ for step in range(steps):
         #Switch target
         #Copy the weights of the new model to the target model every 10000 steps
         if (step % 10000) == 0:
-            print('Copying weights to the old model')
+            print('Copying weights to the target model')
             target_model.set_weights(model.get_weights())
         
         #compute Q-learning targets w.r.t. old FIXED weights
