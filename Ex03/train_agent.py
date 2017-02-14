@@ -4,14 +4,14 @@ from keras.layers import Convolution2D, MaxPooling2D
 from keras.optimizers import Adam
 from keras.regularizers import l2,activity_l2
 from keras.utils import np_utils
-from keras import backend as K
-from keras.models import model_from_json
+from keras.initializations import normal
 
+import json
 # custom modules
 from utils     import Options
 from simulator import Simulator
 from transitionTable import TransitionTable
-from matplotlib import pyplot as plt
+
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # NOTE:
 # this script assumes you did generate your data with the get_data.py script
@@ -34,10 +34,20 @@ trans = TransitionTable(opt.state_siz, opt.act_num, opt.hist_len,
 # # both train_data and valid_data contain tupes of images and labels
 train_data = trans.get_train()
 valid_data = trans.get_valid()
-print("Train data shape:",train_data[0].shape)
-print("Train data labels shape:",train_data[1].shape)
-print("Valid data shape:",valid_data[0].shape)
-print("Valid data labels:",valid_data[1].shape)
+
+print "Train data shape:",train_data[0].shape
+print "Train data labels shape:",train_data[1].shape
+print "Valid data shape:",valid_data[0].shape
+print "Valid data labels:",valid_data[1].shape
+
+# 
+# alternatively you can get one random mini batch line this
+#
+# for i in range(number_of_batches):
+#     x, y = trans.sample_minibatch()
+######################################
+
+# 2. save your trained model
 
 train_imgs = train_data[0]
 train_labels = train_data[1]
@@ -47,14 +57,15 @@ val_labels = valid_data[1]
 #define some parameters for the model
 num_classes = 5
 num_epochs = 10
-kernel_size = (3,3)
-batch_size = 128
+
+batch_size = 32
 num_filters = 32
 pool_size = (2,2)
+img_rows = img_cols= opt.cub_siz*opt.pob_siz
 
 
-train_imgs = train_imgs.reshape(int(train_imgs.shape[0]),50,50,1)
-val_imgs = val_imgs.reshape(int(val_imgs.shape[0]),50,50,1)
+train_imgs = train_imgs.reshape(int(train_imgs.shape[0]),img_rows,img_cols,opt.hist_len)
+val_imgs = val_imgs.reshape(int(val_imgs.shape[0]),img_rows,img_cols,opt.hist_len)
 print("Train imgs shape:",train_imgs.shape)
 print("Val imgs shape:",val_imgs.shape)
 train_imgs = train_imgs.astype('float32')
@@ -69,52 +80,70 @@ val_imgs = val_imgs.astype('float32')
 #     x, y = trans.sample_minibatch()
 ######################################
 
-input_shape = (50,50,1)
-network = Sequential()
-network.add(Convolution2D(num_filters,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same',input_shape = input_shape))
+def model():
+        input_shape = (img_rows,img_cols,opt.hist_len)
+        model = Sequential()
+        model.add(Convolution2D(32,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-network.add(Convolution2D(num_filters,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same'))
-network.add(MaxPooling2D(pool_size=pool_size))
-network.add(Dropout(0.25))
+        model.add(Convolution2D(32,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-network.add(Convolution2D(num_filters*2,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same'))
-network.add(Convolution2D(num_filters*2,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same'))
-network.add(MaxPooling2D(pool_size= pool_size))
-network.add(Dropout(0.25))
+        model.add(MaxPooling2D(pool_size=pool_size))
+        model.add(Dropout(0.5))
 
-network.add(Convolution2D(num_filters*3,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same'))
-network.add(Convolution2D(num_filters*3,kernel_size[0],kernel_size[1],activation='relu',
-                        border_mode='same'))
-network.add(MaxPooling2D(pool_size = pool_size))
-network.add(Dropout(0.25))
+        model.add(Convolution2D(64,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-network.add(Flatten())
-network.add(Dense(256,W_regularizer=l2(0.01),b_regularizer=l2(0.01)))
-network.add(Dropout(0.5))
+        model.add(Convolution2D(64,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-network.add(Dense(num_classes,W_regularizer=l2(0.01),b_regularizer=l2(0.01),activation='softmax'))
+        model.add(MaxPooling2D(pool_size = pool_size))
+        model.add(Dropout(0.5))
 
-network.compile(loss='categorical_crossentropy',optimizer=Adam(lr=0.001),metrics=['accuracy'])
+        model.add(Convolution2D(128,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-network.fit(train_imgs,train_labels,batch_size=batch_size,nb_epoch=num_epochs,verbose=1,
-          validation_data=(val_imgs,val_labels))
+        model.add(Convolution2D(128,3,3,subsample=(1,1),activation='relu',
+                  init = lambda shape, name: normal(shape, scale= 0.01, name= name),
+                  border_mode='same',input_shape=input_shape))
 
-score = network.evaluate(val_imgs,val_labels,verbose=0)
-print("Test Score:",score[0])
-print("Test accuracy:",score[1])
+        model.add(MaxPooling2D(pool_size = pool_size))
+        #model.add(Dropout(0.25))
 
+        model.add(Flatten())
+        model.add(Dense(512,W_regularizer=l2(0.01),b_regularizer=l2(0.01),
+                  init=lambda shape, name: normal(shape, scale=0.01, name=name)))
+        
+        #model.add(Dropout(0.5))
+        model.add(Dense(num_classes,W_regularizer=l2(0.01),b_regularizer=l2(0.01),
+			      init=lambda shape, name: normal(shape, scale=0.01, name=name),activation='softmax'))
+        
+        model.compile(loss='categorical_crossentropy',optimizer=Adam(lr=0.001),metrics=['accuracy'])
 
-# 2. save your trained model
-# serialize model to JSON
-network_json =  network.to_json()
-with open(opt.network_fil,"w") as json_file:
-    json_file.write(network_json)
+        return model
 
-#serialize the weights to HDF5
-network.save_weights(opt.weights_fil)
-print("Saved model to disk")
+def main():
+        agent = model()
+        agent.fit(train_imgs,train_labels,batch_size=batch_size,nb_epoch=num_epochs,verbose=1,
+                  validation_data=(val_imgs,val_labels))
+
+        score = agent.evaluate(val_imgs,val_labels,verbose=0)
+        print("Test Score:",score[0])
+        print("Test accuracy:",score[1])
+
+        # 2. save your trained model
+        # serialize model to JSON
+        agent.save_weights(opt.weights_fil, overwrite=True)
+        print('Saved weights')
+        with open(opt.network_fil, "w") as outfile:
+                json.dump(agent.to_json(), outfile)
+
+if __name__ == "__main__":
+        main()
+

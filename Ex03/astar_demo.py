@@ -16,7 +16,7 @@ epi_step = 0    # #steps in current episode
 nepisodes = 0   # total #episodes executed
 
 
-for step in range(1000):
+for step in range(100):
     if epi_step == 0:
         state = sim.newGame(opt.tgt_y, opt.tgt_x)
         nepisodes += 1
@@ -29,7 +29,6 @@ for step in range(1000):
         # state = sim.step(randrange(opt.act_num))
 
     epi_step += 1
-
 
     if state.terminal or epi_step >= opt.early_stop:
         epi_step = 0

@@ -33,23 +33,23 @@ class Options:
 
     # traing hyper params
     hist_len = 4
-    minibatch_size  = 32
-    n_minibatches   = 500
-    valid_size      = 500
-    eval_nepisodes  = 10
+    minibatch_size = 32
+    n_minibatches = 500
+    valid_size = 500
+    eval_nepisodes = 10
 
-    data_steps  = n_minibatches * minibatch_size + valid_size
-    eval_steps  = early_stop * eval_nepisodes
-    eval_freq   = n_minibatches # evaluate after each epoch
-    prog_freq   = 500
+    data_steps = n_minibatches * minibatch_size + valid_size
+    eval_steps = early_stop * eval_nepisodes
+    eval_freq = n_minibatches # evaluate after each epoch
+    prog_freq = 500
 
 class State: # return tuples made easy
     def __init__(self, action, reward, screen, terminal, pob):
-        self.action   = action
-        self.reward   = reward
-        self.screen   = screen
+        self.action = action
+        self.reward = reward
+        self.screen = screen
         self.terminal = terminal
-        self.pob      = pob
+        self.pob = pob
 
 
 # The following functions were taken from scikit-image
@@ -64,3 +64,4 @@ def rgb2gray(rgb):
     gray[:] += 0.0721 * rgb[..., 2]
 
     return gray
+
